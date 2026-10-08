@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fa">
+  <title>碳粉库存</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">TONER INVENTORY</div>
+      <div class="heading"><h1>碳粉库存</h1><span class="badge">4 个品项</span></div>
+      <p>轻松调整数量，确认后再储存。</p>
+    </header>
+    <section class="summary" aria-label="库存概况">
+      <div><span class="label">当前总库存</span><strong><span id="total">0</span><small>支</small></strong></div>
+      <div class="summary-note"><span class="status-dot"></span><span id="status">已储存</span></div>
+    </section>
+    <section id="items" class="items" aria-label="碳粉品项"></section>
+    <div class="notice" id="notice" role="status" aria-live="polite">数量调整会先暂存，按「储存变更」后才正式保存。</div>
+    <p class="storage-note">库存保存在此设备的浏览器中，不会自动同步到其他设备。</p>
+    <footer>
+      <div class="footer-inner">
+        <div class="change-info"><strong id="change-title">没有待储存的变更</strong><span id="change-subtitle">所有库存已同步到本机</span></div>
+        <div class="actions"><button id="cancel" class="cancel" disabled>取消变更</button><button id="save" class="save" disabled>储存变更</button></div>
+      </div>
+    </footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

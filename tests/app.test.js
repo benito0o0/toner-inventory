@@ -1,0 +1,37 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+test('stage, cancel, save, reload and storage failure', async () => {
+ const nodes = new Map();
+ const get = id => {
+  if (!nodes.has(id)) nodes.set(id, { classList: {toggle(){}}, handlers:{}, addEventListener(t,f){this.handlers[t]=f;} });
+  return nodes.get(id);
+ };
+ const buttons = ['K','C','M','Y'].flatMap(id=>[-2,-1,1,2].map(d=>({dataset:{id,delta:String(d)}})));
+ globalThis.document={getElementById:get,querySelector:()=>get('summary'),querySelectorAll:()=>buttons};
+ let stored=null, fail=false;
+ globalThis.localStorage={getItem:()=>stored,setItem:(_,v)=>{if(fail)throw Error();stored=v;}};
+ globalThis.window={addEventListener(){}};
+ await import('../app.js?first');
+ const click=(id,d)=>get('items').handlers.click({target:{closest:()=>buttons.find(b=>b.dataset.id===id&&+b.dataset.delta===d)}});
+ assert.equal(buttons[0].disabled,true);
+ click('K',2);
+ assert.equal(get('count-K').textContent,'2');
+ assert.equal(stored,null);
+ get('cancel').handlers.click();
+ assert.equal(get('count-K').textContent,'0');
+ click('C',2);
+ get('save').handlers.click();
+ assert.equal(JSON.parse(stored).C,2);
+ assert.equal(get('save').disabled,true);
+ await import('../app.js?reload');
+ assert.equal(get('count-C').textContent,'2');
+ click('C',-1);
+ fail=true;
+ get('save').handlers.click();
+ assert.equal(JSON.parse(stored).C,2);
+ assert.equal(get('count-C').textContent,'1');
+ assert.match(get('notice').textContent,/储存失败/);
+ assert.equal(get('save').disabled,false);
+ get('cancel').handlers.click();
+ assert.equal(get('count-C').textContent,'2');
+});
