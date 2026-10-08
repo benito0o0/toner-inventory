@@ -14,7 +14,7 @@ const api = http.createServer(async (req,res) => {
 });
 await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));
 const apiURL=`http://127.0.0.1:${api.address().port}`;
-const staticFiles=['index.html','style.css','app.js','inventory.js','config.js','cache.js'];
+const staticFiles=['index.html','style.css','app.js','inventory.js','config.js','cache.js','models.js'];
 const files=Object.fromEntries(await Promise.all(staticFiles.map(async f=>[f,await readFile(new URL('../'+f,import.meta.url),'utf8')])));
 const web=http.createServer((req,res)=>{const f=req.url==='/'?'index.html':req.url.slice(1).split('?')[0];if(!files[f]){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(files[f]);});
 await new Promise(resolve=>web.listen(0,'127.0.0.1',resolve));
@@ -131,5 +131,13 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  await freshPage.route('**/transport.js*',route=>route.fulfill({contentType:'text/javascript',body:`export class SheetBridge {async call(action,op){const r=await fetch('${apiURL}/'+action,{method:action==='read'?'GET':'POST',body:action==='read'?undefined:JSON.stringify(op)});return r.json();}close(){}}`}));
  await freshPage.goto(url);await freshPage.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
  assert.equal(await freshPage.locator('#model option').count(),3);await freshContext.close();
+ // 型號依數字位數、數值排序；更新清單時保持既有選取。
+ const previous=await a.locator('#model').inputValue();
+ for(const [index,model]of ['3212','99','2020','325Z','20'].entries())state=applyOperation(state,{id:'sorting-model-'+index,type:'add',brand:'未分類',model,counts:{K:0}},new Date().toISOString());
+ await a.waitForFunction(()=>document.querySelector('#model').options.length===8);
+ const numericLabels=(await a.locator('#model option').allTextContents()).filter(m=>['3212','99','2020','325Z','20'].includes(m));
+ assert.deepEqual(numericLabels,['20','99','325Z','2020','3212']);
+ assert.equal(await a.locator('#model').inputValue(),previous);
+
  console.log('瀏覽器測試通過：手機排版、舊資料備份與遷移、新增與重複檢查、取消、零庫存、5 秒雙裝置同步、暫存衝突、同時儲存、逾時冪等重試、完整歷史與匯出。Google 橋接使用模擬服務，尚待實際部署驗證。');
 }finally{await browser.close();await new Promise(r=>api.close(r));await new Promise(r=>web.close(r));}

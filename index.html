@@ -19,4 +19,4 @@
 <section class="panel"><h2>備份與舊庫存遷移</h2><p>舊資料不會清空。請先在各裝置匯出，再確認採用哪一份。系統不會自行相加，也不會覆蓋既有品項。</p><button id="backup">匯出完整備份（含所有異動）</button><button id="inventory-csv">匯出庫存 CSV</button><button id="history-csv">匯出完整異動 CSV</button><button id="legacy-download">匯出此瀏覽器舊庫存</button><label>載入另一裝置的舊庫存 JSON<input id="legacy-file" type="file" accept=".json,application/json"></label><pre id="legacy-preview"></pre><form id="migrate-form"><input id="migration-brand" type="hidden" value="未分類"><label>匯入型號<input id="migration-model" maxlength="80" required></label><label class="checkbox"><input id="migration-confirm" type="checkbox" required>我已比較各裝置資料，確認只採用上方這份庫存</label><button type="submit">確認匯入這份舊庫存</button></form></section>
 </section>
 <footer><div><strong id="status">尚未連接</strong><span id="draft-info">沒有待儲存變更</span></div><div class="actions"><button id="cancel" disabled>取消變更</button><button id="save" class="primary" disabled>儲存</button></div></footer>
-</main><script type="module" src="app.js?v=20261009-faster-start"></script></body></html>
+</main><script type="module" src="app.js?v=20261009-model-order"></script></body></html>

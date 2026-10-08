@@ -2,6 +2,7 @@ import { colors, emptyState, validCount, conflicts, rebase, filterLogs, readLega
 import { SheetBridge } from './transport.js?v=20261009-anonymous';
 import { defaultEndpoint, chooseEndpoint } from './config.js';
 import { loadSnapshot, saveSnapshot } from './cache.js';
+import { compareModels } from './models.js';
 const $ = id => document.getElementById(id);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const names = { K:'#293241', C:'#00a6c7', M:'#df448a', Y:'#edba32' };
@@ -47,6 +48,7 @@ function renderFilters() {
   options($('brand'), brands, '全部品牌'); options($('history-brand'), brands, '全部品牌');
   $('brands-list').innerHTML = brands.map(b => `<option value="${escape(b)}"></option>`).join('');
   const models = [...new Map(state.items.filter(i => (!$('brand').value || i.brand === $('brand').value) && i.model.toLowerCase().includes($('search').value.toLowerCase())).map(i => [JSON.stringify([i.brand,i.model]), i])).values()];
+  models.sort((a, b) => compareModels(a.model, b.model));
   const selected = $('model').value;
   $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.model)}</option>`).join('');
   if (models.some(i => JSON.stringify([i.brand,i.model]) === selected)) $('model').value = selected;
