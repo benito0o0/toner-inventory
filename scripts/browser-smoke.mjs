@@ -4,17 +4,17 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { emptyState, applyOperation } from '../inventory.js';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-let state = emptyState(), loseResponse = false, simultaneousGate = null;
+let state = emptyState(), loseResponse = false, simultaneousGate = null, delayReads = false;
 const api = http.createServer(async (req,res) => {
  res.setHeader('Access-Control-Allow-Origin','*');
- if(req.url==='/read'){res.end(JSON.stringify({...state,items:[...state.items].sort((a,b)=>['M','Y','K','C'].indexOf(a.color)-['M','Y','K','C'].indexOf(b.color))}));return;}
+ if(req.url==='/read'){if(delayReads)await new Promise(resolve=>setTimeout(resolve,1500));res.end(JSON.stringify({...state,items:[...state.items].sort((a,b)=>['M','Y','K','C'].indexOf(a.color)-['M','Y','K','C'].indexOf(b.color))}));return;}
  let body='';for await(const chunk of req)body+=chunk;
  try{const op=JSON.parse(body);if(simultaneousGate){const gate=simultaneousGate;gate.remaining--;if(!gate.remaining){simultaneousGate=null;gate.release();}await gate.promise;}state=applyOperation(state,op,new Date().toISOString());if(loseResponse){loseResponse=false;res.writeHead(503);res.end('模擬儲存完成後回覆中斷');return;}res.end(JSON.stringify({state}));}
  catch(e){res.end(JSON.stringify({error:e.message,rejected:true}));}
 });
 await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));
 const apiURL=`http://127.0.0.1:${api.address().port}`;
-const staticFiles=['index.html','style.css','app.js','inventory.js','config.js'];
+const staticFiles=['index.html','style.css','app.js','inventory.js','config.js','cache.js'];
 const files=Object.fromEntries(await Promise.all(staticFiles.map(async f=>[f,await readFile(new URL('../'+f,import.meta.url),'utf8')])));
 const web=http.createServer((req,res)=>{const f=req.url==='/'?'index.html':req.url.slice(1).split('?')[0];if(!files[f]){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(files[f]);});
 await new Promise(resolve=>web.listen(0,'127.0.0.1',resolve));
@@ -45,7 +45,7 @@ try{
  const k=state.items.find(i=>i.color==='K').id;
  await a.locator(`[data-item="${k}"][data-delta="2"]`).click();assert.equal(state.items[0].count,5);
  await a.locator('#cancel').click();assert.equal(state.logs.length,4);
- // 第二裝置透過 15 秒輪詢自動讀到新項目。
+ // 第二裝置透過 5 秒輪詢自動讀到新項目。
  await b.locator('nav [data-tab="home"]').click();await b.waitForSelector(`[data-item="${k}"]`,{timeout:20000});
  const desktop=await b.locator('#items .card').evaluateAll(cards=>cards.map(c=>({color:c.querySelector('.mark').textContent,x:c.getBoundingClientRect().x,y:c.getBoundingClientRect().y})));
  assert.deepEqual(desktop.map(c=>c.color),['K','C','M','Y']);
@@ -95,6 +95,15 @@ try{
  assert.equal(await a.evaluate(()=>JSON.parse(localStorage.getItem('toner-inventory.v1')).K),5);
  await a.locator('nav [data-tab="home"]').click();await a.screenshot({path:'/tmp/toner-mobile.png',fullPage:true});
  assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ // 再次開啟先顯示已確認快取；正式讀取前不能儲存，讀取後才啟用。
+ delayReads=true;await a.reload();
+ await a.waitForFunction(()=>document.querySelector('#connection').textContent.includes('顯示上次確認'));
+ assert.ok(await a.locator('#items .card').count()>0);
+ assert.equal(await a.locator('#save').isDisabled(),true);
+ assert.ok((await a.locator('#items [data-delta]').evaluateAll(buttons=>buttons.every(b=>b.disabled))));
+ await a.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
+ delayReads=false;
+
  // 使用真正 transport.js 和巢狀 iframe 驗證橋接握手／回覆；Google 執行環境仍為測試替身。
  const bridgeContext=await browser.newContext({viewport:{width:390,height:844}});
  const bridgePage=await bridgeContext.newPage();
@@ -122,5 +131,5 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  await freshPage.route('**/transport.js*',route=>route.fulfill({contentType:'text/javascript',body:`export class SheetBridge {async call(action,op){const r=await fetch('${apiURL}/'+action,{method:action==='read'?'GET':'POST',body:action==='read'?undefined:JSON.stringify(op)});return r.json();}close(){}}`}));
  await freshPage.goto(url);await freshPage.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
  assert.equal(await freshPage.locator('#model option').count(),3);await freshContext.close();
- console.log('瀏覽器測試通過：手機排版、舊資料備份與遷移、新增與重複檢查、取消、零庫存、15 秒雙裝置同步、暫存衝突、同時儲存、逾時冪等重試、完整歷史與匯出。Google 橋接使用模擬服務，尚待實際部署驗證。');
+ console.log('瀏覽器測試通過：手機排版、舊資料備份與遷移、新增與重複檢查、取消、零庫存、5 秒雙裝置同步、暫存衝突、同時儲存、逾時冪等重試、完整歷史與匯出。Google 橋接使用模擬服務，尚待實際部署驗證。');
 }finally{await browser.close();await new Promise(r=>api.close(r));await new Promise(r=>web.close(r));}

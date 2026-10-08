@@ -24,13 +24,13 @@ npm start
 - 首頁顯示最近五筆，歷史區保留全部紀錄，以臺北日期、品牌及型號篩選，每頁二十筆。
 - 設定區可匯出正式庫存 CSV、全部異動 CSV，或含完整共用資料與本機暫存的 JSON 備份。離線匯出只反映最後成功讀取的資料，備份附有讀取時間。
 
-共用庫存儲存在 Google 試算表，前端 localStorage 僅保留部署網址、待儲存增減及待確認的操作 ID。沒有共用服務時不會冒充已同步，也不會自動改用獨立本機庫存。
+共用庫存儲存在 Google 試算表。前端 localStorage 保留部署網址、待儲存增減及待確認操作 ID，另選用儲存完整的上次已確認共用資料（上限 500,000 字元；超出或空間不足則不快取，不截斷正式歷史）。再次開啟立即顯示快取與時間，但在正式讀取完成前停用操作，快取不會冒充最新資料或成功儲存。第一次開啟或新無痕工作階段沒有快取，仍需等待 Google 回應。儲存成功已收到正式完整資料，不再立即重複讀取。前景每 5 秒同步，背景暫停，回到前景立即讀取；未變更資料不重建全部卡片與歷史畫面。沒有共用服務時不會冒充已同步，也不會自動改用獨立本機庫存。
 
 ## GitHub Pages 與 Google 串接方案
 
 GitHub Pages 沒有後端。Google Apps Script 綁定試算表、以擁有者身分執行並允許任何人存取。前端內嵌 HtmlService 橋接頁，使用限制來源的 postMessage 與 google.script.run 呼叫伺服器，避免以 `no-cors` 寫入而無法確認結果。Apps Script 橋接尚需在真實部署驗證；瀏覽器設定或組織政策可能阻擋匿名嵌入。
 
-每 **15 秒**讀取共用資料，回到頁面時也會讀取。這是定時同步，非真正即時推送；背景分頁、網路及 Apps Script 配額可能延後更新。
+每 **5 秒**讀取共用資料，回到頁面時也會讀取。這是定時同步，非真正即時推送；背景分頁、網路及 Apps Script 配額可能延後更新。
 
 支援 `credentialless` 的瀏覽器會以獨立匿名 iframe 連接公開服務，減少既有 Google 登入 Cookie 的影響；不支援的瀏覽器維持原連線方式。這不會登出使用者或變更全域瀏覽器安全設定；原先發生 404 的使用者 Chrome 仍需實測確認。
 
@@ -79,7 +79,7 @@ npm install --prefix /tmp/toner-browser --cache /tmp/toner-npm-cache --no-audit 
 PLAYWRIGHT_MODULE=/tmp/toner-browser/node_modules/playwright/index.mjs node scripts/browser-smoke.mjs
 ```
 
-需安裝 Chromium，預設 `/usr/bin/chromium`，可用 `CHROMIUM_PATH` 指定。瀏覽器測試使用兩個獨立工作階段及模擬共用服務，涵蓋手機排版、舊資料備份、匯入、暫存取消、零庫存、每 15 秒同步、他人更新保留暫存、同時儲存衝突、已提交但回覆失敗的重試、完整紀錄、重複建立及匯出。
+需安裝 Chromium，預設 `/usr/bin/chromium`，可用 `CHROMIUM_PATH` 指定。瀏覽器測試使用兩個獨立工作階段及模擬共用服務，涵蓋手機排版、舊資料備份、匯入、暫存取消、零庫存、每 5 秒同步、他人更新保留暫存、同時儲存衝突、已提交但回覆失敗的重試、完整紀錄、重複建立及匯出。
 
 **已驗證**：Google Apps Script 真實匿名讀取、Google iframe 橋接、新增 3212／K 黑／1 支並讀回、全新 Chromium 工作階段使用預設服務自動連線（含 credentialless iframe）。
 

@@ -1,11 +1,12 @@
 import { colors, emptyState, validCount, conflicts, rebase, filterLogs, readLegacy } from './inventory.js';
 import { SheetBridge } from './transport.js?v=20261009-anonymous';
 import { defaultEndpoint, chooseEndpoint } from './config.js';
+import { loadSnapshot, saveSnapshot } from './cache.js';
 const $ = id => document.getElementById(id);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const names = { K:'#293241', C:'#00a6c7', M:'#df448a', Y:'#edba32' };
 const workspaceKey = 'toner-inventory.workspace.v2';
-let state = emptyState(), drafts = {}, pending = null, bridge = null, connected = false, busy = false, polling = false, page = 0, endpoint = defaultEndpoint, lastRead = '', legacyRaw = null, legacy = null, storageHealthy = true;
+let state = emptyState(), drafts = {}, pending = null, bridge = null, connected = false, busy = false, polling = false, page = 0, endpoint = defaultEndpoint, lastRead = '', cachedAt = '', legacyRaw = null, legacy = null, storageHealthy = true;
 function message(text) { $('notice').textContent = text; }
 try {
   legacyRaw = localStorage.getItem('toner-inventory.v1');
@@ -66,13 +67,16 @@ function renderCards() {
   $('summary').textContent = selected.length ? `已選取 ${selected[0].model}，共 ${selected.length} 個顏色` : (state.items.length ? '沒有符合條件的型號' : '尚無共用品項；請在設定新增或匯入舊庫存。');
   $('items').innerHTML = selected.map(i => {
     const d = drafts[i.id], count = d ? d.base + d.delta : i.count;
-    return `<article class="card" style="--ink:${names[i.color]}"><div class="identity"><span class="mark ${i.color}">${i.color}</span><h2>${colors[i.color]}色碳粉</h2></div><div class="quantity">${count}<small>支</small></div><div class="saved">最新共用庫存：${i.count} 支${d ? `<br>我的暫存：${d.delta>0?'+':''}${d.delta}（原庫存 ${d.base}）` : ''}</div><div class="controls">${[-2,-1,1,2].map(delta => `<button data-item="${escape(i.id)}" data-delta="${delta}" aria-label="${i.color} ${colors[i.color]}${delta>0?'加':'減'}${Math.abs(delta)}支" ${busy || pending || !connected || !storageHealthy || !validCount(count+delta) ? 'disabled' : ''}>${delta>0?'+':'−'}${Math.abs(delta)}</button>`).join('')}</div></article>`;
+    return `<article class="card" style="--ink:${names[i.color]}"><div class="identity"><span class="mark ${i.color}">${i.color}</span><h2>${colors[i.color]}色碳粉</h2></div><div class="quantity">${count}<small>支</small></div><div class="saved">${connected ? '最新共用庫存' : '上次確認庫存'}：${i.count} 支${d ? `<br>我的暫存：${d.delta>0?'+':''}${d.delta}（原庫存 ${d.base}）` : ''}</div><div class="controls">${[-2,-1,1,2].map(delta => `<button data-item="${escape(i.id)}" data-delta="${delta}" aria-label="${i.color} ${colors[i.color]}${delta>0?'加':'減'}${Math.abs(delta)}支" ${busy || pending || !connected || !storageHealthy || !validCount(count+delta) ? 'disabled' : ''}>${delta>0?'+':'−'}${Math.abs(delta)}</button>`).join('')}</div></article>`;
   }).join('');
+}
+function renderConnection() {
+  $('connection').textContent = connected ? `已連接共用資料 · 每 5 秒同步 · 上次成功讀取 ${lastRead}` : cachedAt ? `顯示上次確認的共用資料（${lastRead}），尚待連線確認最新庫存` : '尚未連接或連線中斷；不會把本機資料冒充共用庫存';
 }
 function render() {
   renderFilters(); renderCards(); renderHistory();
   $('recent').innerHTML = logHTML(state.logs.slice(-5).reverse());
-  $('connection').textContent = connected ? `已連接共用資料 · 每 15 秒同步 · 上次成功讀取 ${lastRead}` : '尚未連接或連線中斷；不會把本機資料冒充共用庫存';
+  renderConnection();
   const collision = conflicts(state, drafts).length;
   $('conflict').hidden = !collision;
   $('rebase').disabled = busy || !!pending || !connected;
@@ -86,7 +90,7 @@ function render() {
   $('connect-form').querySelector('button').disabled = busy || !!pending || !!Object.keys(drafts).length;
 }
 async function refresh() {
-  if (!bridge || busy || polling) return;
+  if (!bridge || busy || polling || document.hidden) return;
   polling = true;
   try {
     const source = bridge;
@@ -95,23 +99,28 @@ async function refresh() {
     if (source !== bridge) return;
     if (next.schema !== 2 || !Array.isArray(next.items) || !Array.isArray(next.logs)) throw Error('共用資料格式無效');
     const changed = state.revision !== next.revision;
-    if (next.revision >= state.revision) state = next; connected = true; lastRead = new Date().toLocaleTimeString('zh-TW');
+    if (!connected || next.revision >= state.revision) state = next; connected = true; cachedAt = ''; lastRead = new Date().toLocaleTimeString('zh-TW');
+    saveSnapshot(localStorage, endpoint, state, new Date().toISOString());
     if (recovering) message(pending ? '連接成功，已讀取共用資料。仍有操作結果待確認，請重試同一筆操作。' : Object.keys(drafts).length ? '連接成功，已讀取共用資料；你的待儲存變更仍保留。' : '連接成功，已讀取共用資料。');
     if (changed && Object.keys(drafts).length) message('已收到他人更新；你的暫存內容仍保留。若有衝突，請核對後重新套用或取消。');
-    render();
+    if (changed || recovering) render(); else renderConnection();
   } catch (e) { connected = false; message(`讀取失敗：${e.message}。暫存仍保留，將自動重試連線。`); render(); }
   finally { polling = false; }
 }
 async function connect(url) {
   try {
     if (bridge) bridge.close();
-    bridge = new SheetBridge(url); state = emptyState(); endpoint = url; persist();
-    connected = false; message('正在連接共用資料…'); render(); await refresh();
+    endpoint = url; connected = false;
+    const snapshot = loadSnapshot(localStorage, endpoint);
+    state = snapshot?.state || emptyState(); cachedAt = snapshot?.savedAt || '';
+    lastRead = cachedAt ? new Date(cachedAt).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false }) : '';
+    bridge = new SheetBridge(url); persist();
+    message(snapshot ? '已先顯示上次確認的共用庫存；正在背景讀取最新資料，確認前暫停加減與儲存。' : '正在連接共用資料…'); render(); await refresh();
   } catch (e) { connected = false; message(e.message); render(); }
 }
 async function submit(operation) {
   if (busy || !bridge || !connected || !storageHealthy) return;
-  busy = true;
+  busy = true; let savedSuccessfully = false;
   try {
     if (!pending) { pending = operation; persist(); }
     message('儲存中，請勿重複送出…'); render();
@@ -124,9 +133,10 @@ async function submit(operation) {
     state = result.state;
     if (pending.type === 'adjust') drafts = {};
     pending = null; persist(); lastRead = new Date().toLocaleTimeString('zh-TW');
+    saveSnapshot(localStorage, endpoint, state, new Date().toISOString()); savedSuccessfully = true;
     message('儲存成功，已寫入共用試算表。' + (result.warning || ''));
   } catch (e) { message(`儲存失敗或結果未確認：${e.message}。待儲存內容仍保留。`); }
-  finally { busy = false; render(); if (!pending) await refresh(); }
+  finally { busy = false; render(); if (!pending && !savedSuccessfully) await refresh(); }
 }
 function newOperation(type, data) { return { id: crypto.randomUUID(), type, ...data }; }
 function cancel() { if (busy || pending) return; drafts = {}; try { persist(); message('已取消暫存變更，未新增正式異動紀錄。'); } catch(e) { message(e.message); } render(); }
@@ -168,6 +178,6 @@ $('backup').addEventListener('click', () => download('碳粉庫存完整備份.j
 $('inventory-csv').addEventListener('click', () => exportCSV('碳粉庫存.csv',[['品牌','型號','顏色','庫存'],...state.items.map(i=>[i.brand,i.model,`${i.color} ${colors[i.color]}`,i.count])]));
 $('history-csv').addEventListener('click', () => exportCSV('完整異動紀錄.csv',[['時間','品牌','型號','顏色','增減','變更前','變更後','類型','操作識別碼'],...state.logs.map(l=>[l.time,l.brand,l.model,`${l.color} ${colors[l.color]}`,l.delta,l.before,l.after,l.kind,l.operationId])]));
 window.addEventListener('beforeunload', e => { if(Object.keys(drafts).length || pending){e.preventDefault();e.returnValue='';} });
-setInterval(refresh,15000); document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+setInterval(refresh,5000); document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 if (legacyRaw) { try { const original = readLegacy(legacyRaw); $('legacy-home').hidden = false; $('legacy-home-counts').textContent = Object.entries(original).map(([c,n]) => `${c} ${colors[c]}：${n} 支`).join(' · '); } catch {} }
 $('endpoint').value = endpoint; initialFields(); showLegacy(); render(); if(endpoint)connect(endpoint);
