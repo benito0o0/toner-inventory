@@ -88,11 +88,13 @@ async function refresh() {
   polling = true;
   try {
     const source = bridge;
+    const recovering = !connected;
     const next = await source.call('read');
     if (source !== bridge) return;
     if (next.schema !== 2 || !Array.isArray(next.items) || !Array.isArray(next.logs)) throw Error('共用資料格式無效');
     const changed = state.revision !== next.revision;
     if (next.revision >= state.revision) state = next; connected = true; lastRead = new Date().toLocaleTimeString('zh-TW');
+    if (recovering) message(pending ? '連接成功，已讀取共用資料。仍有操作結果待確認，請重試同一筆操作。' : Object.keys(drafts).length ? '連接成功，已讀取共用資料；你的待儲存變更仍保留。' : '連接成功，已讀取共用資料。');
     if (changed && Object.keys(drafts).length) message('已收到他人更新；你的暫存內容仍保留。若有衝突，請核對後重新套用或取消。');
     render();
   } catch (e) { connected = false; message(`讀取失敗：${e.message}。暫存仍保留，將自動重試連線。`); render(); }

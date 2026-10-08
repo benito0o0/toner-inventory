@@ -99,6 +99,7 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  });
  await bridgePage.goto(url);await bridgePage.locator('nav [data-tab="settings"]').click();await bridgePage.locator('#endpoint').fill('https://script.google.com/macros/s/bridge-test/exec');await bridgePage.locator('#connect-form button').click();
  await bridgePage.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
+ assert.match(await bridgePage.locator('#notice').textContent(),/連接成功/);
  await bridgePage.locator('#new-brand').fill('橋接測試');await bridgePage.locator('#new-model').fill('黑白設備');await bridgePage.locator('#add-form button').click();await bridgePage.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(await bridgePage.evaluate(()=>document.querySelector('#model').options.length),2);
  await bridgeContext.close();
