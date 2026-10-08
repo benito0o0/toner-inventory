@@ -16,8 +16,8 @@ function harness(){
   getMaxRows(){return this.rows;} insertRowsAfter(_,n){this.rows+=n;} setFrozenRows(){}
  }
  const ss={getId:()=> 'test-sheet',getSheetByName:n=>sheets.get(n),insertSheet:n=>{const s=new Sheet();sheets.set(n,s);return s;}};
- const props=new Map();const blob=data=>({getBytes:()=>Buffer.from(data),getDataAsString:()=>Buffer.from(data).toString()});
- const context=vm.createContext({console,SpreadsheetApp:{getActiveSpreadsheet:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:n=>props.get(n),setProperty:(n,v)=>props.set(n,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64Encode:b=>Buffer.from(b).toString('base64'),base64Decode:s=>Buffer.from(s,'base64'),newBlob:blob,gzip:b=>blob(zlib.gzipSync(b.getBytes())),ungzip:b=>blob(zlib.gunzipSync(b.getBytes()))}});
+ const props=new Map();const blob=(data,type=null)=>({getBytes:()=>Buffer.from(data),getContentType:()=>type,getDataAsString:()=>Buffer.from(data).toString()});
+ const context=vm.createContext({console,SpreadsheetApp:{getActiveSpreadsheet:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:n=>props.get(n),setProperty:(n,v)=>props.set(n,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64Encode:b=>Buffer.from(b).toString('base64'),base64Decode:s=>Buffer.from(s,'base64'),newBlob:blob,gzip:b=>{assert.ok(b.getContentType(),'壓縮 Blob 必須指定內容類型');return blob(zlib.gzipSync(b.getBytes()),'application/gzip');},ungzip:b=>{assert.equal(b.getContentType(),'application/gzip','解壓縮 Blob 必須指定 gzip 內容類型');return blob(zlib.gunzipSync(b.getBytes()),'application/json');}}});
  return {context,sheets,failPointer:()=>failPointer=true};
 }
 test('Apps Script 後端：交易快照、鎖定、失敗回復、重試及兩裝置衝突',async()=>{
@@ -28,6 +28,7 @@ test('Apps Script 後端：交易快照、鎖定、失敗回復、重試及兩�
  assert.equal(api({action:'read'}).items.length,0);
  let s=api({action:'write',operation:op}).state;
  assert.equal(s.items[0].count,5);assert.equal(api({action:'write',operation:op}).state.logs.length,1);
+ setup();assert.equal(api({action:'read'}).items[0].count,5);assert.equal(api({action:'read'}).logs.length,1);
  const id=s.items[0].id;
  const a={id:'device-a-00001',type:'adjust',changes:[{id,version:1,delta:-4}]};
  const b={id:'device-b-00001',type:'adjust',changes:[{id,version:1,delta:-2}]};

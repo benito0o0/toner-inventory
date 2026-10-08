@@ -31,7 +31,7 @@ function readState_() {
   const pointer = JSON.parse(raw);
   const encoded = sheet.getRange(pointer.row, 1, pointer.chunks, 1).getValues().map(r => r[0]).join('');
   if (digest_(encoded) !== pointer.hash) throw Error('系統資料校驗失敗，已停止寫入；請由擁有者還原備份');
-  const json = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded))).getDataAsString('UTF-8');
+  const json = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded), 'application/gzip')).getDataAsString('UTF-8');
   const state = JSON.parse(json);
   if (state.schema !== 2) throw Error('資料版本不符');
   return state;
