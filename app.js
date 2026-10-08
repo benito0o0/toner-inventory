@@ -62,7 +62,7 @@ function renderCards() {
   $('summary').textContent = selected.length ? `已選取 ${selected[0].model}，共 ${selected.length} 個顏色` : (state.items.length ? '沒有符合條件的型號' : '尚無共用品項；請在設定新增或匯入舊庫存。');
   $('items').innerHTML = selected.map(i => {
     const d = drafts[i.id], count = d ? d.base + d.delta : i.count;
-    return `<article class="card" style="--ink:${names[i.color]}"><div class="identity"><span class="mark ${i.color}">${i.color}</span><h2>${colors[i.color]}色碳粉</h2></div><div class="quantity">${count}<small>支</small></div><div class="saved">最新共用庫存：${i.count} 支${d ? `<br>我的暫存：${d.delta>0?'+':''}${d.delta}（原庫存 ${d.base}）` : ''}</div>${i.count <= i.threshold ? `<span class="low">低庫存提醒：門檻 ${i.threshold} 支</span>` : ''}<div class="controls">${[-2,-1,1,2].map(delta => `<button data-item="${escape(i.id)}" data-delta="${delta}" aria-label="${i.color} ${colors[i.color]}${delta>0?'加':'減'}${Math.abs(delta)}支" ${busy || pending || !connected || !storageHealthy || !validCount(count+delta) ? 'disabled' : ''}>${delta>0?'+':'−'}${Math.abs(delta)}</button>`).join('')}</div></article>`;
+    return `<article class="card" style="--ink:${names[i.color]}"><div class="identity"><span class="mark ${i.color}">${i.color}</span><h2>${colors[i.color]}色碳粉</h2></div><div class="quantity">${count}<small>支</small></div><div class="saved">最新共用庫存：${i.count} 支${d ? `<br>我的暫存：${d.delta>0?'+':''}${d.delta}（原庫存 ${d.base}）` : ''}</div><div class="controls">${[-2,-1,1,2].map(delta => `<button data-item="${escape(i.id)}" data-delta="${delta}" aria-label="${i.color} ${colors[i.color]}${delta>0?'加':'減'}${Math.abs(delta)}支" ${busy || pending || !connected || !storageHealthy || !validCount(count+delta) ? 'disabled' : ''}>${delta>0?'+':'−'}${Math.abs(delta)}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function render() {
@@ -78,11 +78,8 @@ function render() {
   $('cancel').disabled = busy || !!pending || !Object.keys(drafts).length;
   $('draft-info').textContent = pending ? '待確認操作結果；請重試，暫勿取消或再次新增' : `${Object.keys(drafts).length} 個品項尚未儲存`;
   $('status').textContent = busy ? '儲存中…' : pending ? '結果尚未確認／儲存失敗' : !connected ? '尚未連接' : collision ? '變更衝突，請核對' : Object.keys(drafts).length ? '尚未儲存' : '共用庫存已載入';
-  document.querySelectorAll('#add-form button, #threshold-form button, #migrate-form button').forEach(b => b.disabled = busy || !!pending || !connected || !storageHealthy || !!Object.keys(drafts).length);
+  document.querySelectorAll('#add-form button, #migrate-form button').forEach(b => b.disabled = busy || !!pending || !connected || !storageHealthy || !!Object.keys(drafts).length);
   $('connect-form').querySelector('button').disabled = busy || !!pending || !!Object.keys(drafts).length;
-}
-function renderThresholds() {
-  $('thresholds').innerHTML = currentItems().map(i => `<label>${i.color} ${colors[i.color]}：目前門檻 ${i.threshold}<input type="number" min="0" max="1000000000" step="1" required data-threshold="${escape(i.id)}" data-version="${i.version}" value="${i.threshold}"></label>`).join('');
 }
 async function refresh() {
   if (!bridge || busy || polling) return;
@@ -105,7 +102,7 @@ async function connect(url) {
   try {
     if (bridge) bridge.close();
     bridge = new SheetBridge(url); state = emptyState(); endpoint = url; persist();
-    connected = false; message('正在連接共用資料…'); render(); await refresh(); renderThresholds();
+    connected = false; message('正在連接共用資料…'); render(); await refresh();
   } catch (e) { connected = false; message(e.message); render(); }
 }
 async function submit(operation) {
@@ -125,7 +122,7 @@ async function submit(operation) {
     pending = null; persist(); lastRead = new Date().toLocaleTimeString('zh-TW');
     message('儲存成功，已寫入共用試算表。' + (result.warning || ''));
   } catch (e) { message(`儲存失敗或結果未確認：${e.message}。待儲存內容仍保留。`); }
-  finally { busy = false; render(); renderThresholds(); if (!pending) await refresh(); }
+  finally { busy = false; render(); if (!pending) await refresh(); }
 }
 function newOperation(type, data) { return { id: crypto.randomUUID(), type, ...data }; }
 function cancel() { if (busy || pending) return; drafts = {}; try { persist(); message('已取消暫存變更，未新增正式異動紀錄。'); } catch(e) { message(e.message); } render(); }
@@ -142,32 +139,29 @@ $('save').addEventListener('click', () => submit(pending || newOperation('adjust
 $('cancel').addEventListener('click', cancel); $('discard').addEventListener('click', cancel);
 $('rebase').addEventListener('click', () => { try { drafts = rebase(state,drafts); persist(); message('已確認以最新庫存重新套用，請按儲存。'); } catch(e) { message(e.message); } render(); });
 $('connect-form').addEventListener('submit', e => { e.preventDefault(); connect($('endpoint').value.trim()); });
-for (const id of ['brand','search']) $(id).addEventListener('input', () => { render(); renderThresholds(); });
-$('model').addEventListener('change', () => { renderCards(); renderThresholds(); });
+for (const id of ['brand','search']) $(id).addEventListener('input', () => { render(); });
+$('model').addEventListener('change', () => { renderCards(); });
 for (const id of ['start-date','end-date','history-brand','history-model']) $(id).addEventListener('input', () => { page = 0; renderHistory(); });
 $('prev').addEventListener('click', () => { page--; renderHistory(); }); $('next').addEventListener('click', () => { page++; renderHistory(); });
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(s => s.hidden = s.id !== button.dataset.tab);
   document.querySelectorAll('nav button').forEach(b => { if(b.dataset.tab===button.dataset.tab)b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
-  if (button.dataset.tab === 'settings') renderThresholds();
 }));
 function initialFields() {
-  $('initial-counts').innerHTML = [...$('color-mode').value].map(c => `<div><label>${c} ${colors[c]}初始數量<input data-initial="${c}" type="number" min="0" max="1000000000" step="1" value="0" required></label><label>${c} 低庫存門檻<input data-initial-threshold="${c}" type="number" min="0" max="1000000000" step="1" value="0" required></label></div>`).join('');
+  $('initial-counts').innerHTML = [...$('color-mode').value].map(c => `<div><label>${c} ${colors[c]}初始數量<input data-initial="${c}" type="number" min="0" max="1000000000" step="1" value="0" required></label></div>`).join('');
 }
 $('color-mode').addEventListener('change', initialFields);
 $('add-form').addEventListener('submit', e => {
   e.preventDefault();
   const counts = Object.fromEntries([...document.querySelectorAll('[data-initial]')].map(i => [i.dataset.initial,Number(i.value)]));
-  const thresholds = Object.fromEntries([...document.querySelectorAll('[data-initial-threshold]')].map(i => [i.dataset.initialThreshold,Number(i.value)]));
-  submit(newOperation('add', { brand:$('new-brand').value.trim(), model:$('new-model').value.trim(), counts,thresholds }));
+  submit(newOperation('add', { brand:$('new-brand').value.trim(), model:$('new-model').value.trim(), counts }));
 });
-$('threshold-form').addEventListener('submit', e => { e.preventDefault(); const changes = [...document.querySelectorAll('[data-threshold]')].map(i => ({ id:i.dataset.threshold,version:Number(i.dataset.version),threshold:Number(i.value) })); if(changes.length)submit(newOperation('threshold',{changes})); });
 function showLegacy() { $('legacy-preview').textContent = legacy ? '待確認的舊庫存：\n' + Object.entries(legacy).map(([c,n]) => `${c} ${colors[c]}：${n} 支`).join('\n') : '此瀏覽器沒有可用的舊庫存；可載入其他裝置匯出的檔案。'; $('migration-confirm').checked = false; }
 $('legacy-download').addEventListener('click', () => { if(legacyRaw)download('舊庫存原始備份.json',legacyRaw); else message('此瀏覽器沒有舊庫存。'); });
 $('legacy-file').addEventListener('change', async e => { try { const file=e.target.files[0]; if(!file)return; if(file.size>100000)throw Error('舊庫存檔案過大'); const raw=await file.text(); const parsed=readLegacy(raw); legacy=parsed; showLegacy(); } catch(e) { message(e.message); } });
-$('migrate-form').addEventListener('submit', e => { e.preventDefault(); if(!legacy || !$('migration-confirm').checked)return; submit(newOperation('add',{brand:$('migration-brand').value.trim(),model:$('migration-model').value.trim(),counts:legacy,thresholds:{},migration:true})); });
+$('migrate-form').addEventListener('submit', e => { e.preventDefault(); if(!legacy || !$('migration-confirm').checked)return; submit(newOperation('add',{brand:$('migration-brand').value.trim(),model:$('migration-model').value.trim(),counts:legacy,migration:true})); });
 $('backup').addEventListener('click', () => download('碳粉庫存完整備份.json',JSON.stringify({ exportedAt:new Date().toISOString(), lastSuccessfulRead:lastRead, state,drafts,pending, legacyOriginal:legacyRaw },null,2)));
-$('inventory-csv').addEventListener('click', () => exportCSV('碳粉庫存.csv',[['品牌','型號','顏色','庫存','低庫存門檻'],...state.items.map(i=>[i.brand,i.model,`${i.color} ${colors[i.color]}`,i.count,i.threshold])]));
+$('inventory-csv').addEventListener('click', () => exportCSV('碳粉庫存.csv',[['品牌','型號','顏色','庫存'],...state.items.map(i=>[i.brand,i.model,`${i.color} ${colors[i.color]}`,i.count])]));
 $('history-csv').addEventListener('click', () => exportCSV('完整異動紀錄.csv',[['時間','品牌','型號','顏色','增減','變更前','變更後','類型','操作識別碼'],...state.logs.map(l=>[l.time,l.brand,l.model,`${l.color} ${colors[l.color]}`,l.delta,l.before,l.after,l.kind,l.operationId])]));
 window.addEventListener('beforeunload', e => { if(Object.keys(drafts).length || pending){e.preventDefault();e.returnValue='';} });
 setInterval(refresh,15000); document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});

@@ -28,6 +28,7 @@ try{
   await p.goto(url);
   await p.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
   assert.match(await p.locator('#notice').textContent(),/連接成功/);
+  assert.equal(await p.locator('#threshold-form, [data-initial-threshold], .low').count(),0);
  }
  await a.evaluate(()=>localStorage.setItem('toner-inventory.v1',JSON.stringify({K:5,C:2,M:0,Y:1})));
  await a.reload();await assert.equal(await a.evaluate(()=>localStorage.getItem('toner-inventory.v1.backup')),JSON.stringify({K:5,C:2,M:0,Y:1}));
@@ -71,6 +72,7 @@ try{
  for(let n=0;n<2;n++)await success.locator(`[data-item="${k}"][data-delta="-2"]`).click();
  await success.locator('#save').click();await success.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(state.items.length,4);assert.equal(state.items[0].count,0);
+ assert.equal(await success.locator('.low').count(),0);
  assert.equal(await success.locator(`[data-item="${k}"][data-delta="-1"]`).isDisabled(),true);
  assert.equal(await success.locator('#recent .log').count(),5);
  await success.locator('nav [data-tab="history"]').click();assert.equal(await success.locator('#history-list .log').count(),state.logs.length);
