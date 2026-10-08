@@ -95,7 +95,7 @@ async function refresh() {
     if (next.revision >= state.revision) state = next; connected = true; lastRead = new Date().toLocaleTimeString('zh-TW');
     if (changed && Object.keys(drafts).length) message('已收到他人更新；你的暫存內容仍保留。若有衝突，請核對後重新套用或取消。');
     render();
-  } catch (e) { connected = false; message(`讀取失敗：${e.message}。暫存仍保留，15 秒後再嘗試。`); render(); }
+  } catch (e) { connected = false; message(`讀取失敗：${e.message}。暫存仍保留，將自動重試連線。`); render(); }
   finally { polling = false; }
 }
 async function connect(url) {
