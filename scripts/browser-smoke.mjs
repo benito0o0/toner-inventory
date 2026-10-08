@@ -36,18 +36,22 @@ try{
  await a.locator('#migration-model').fill('四色設備');await a.locator('#migration-confirm').check();await a.locator('#migrate-form button').click();await a.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(state.items.length,4);assert.equal(state.items[0].count,5);
  await a.locator('nav [data-tab="home"]').click();
- // 即使共用資料順序不同，手機仍固定 K／C／M／Y 的兩欄位置。
+ // 即使共用資料順序不同，手機仍固定由上而下 K／C／M／Y。
  const layout=await a.locator('#items .card').evaluateAll(cards=>cards.map(c=>({color:c.querySelector('.mark').textContent,x:c.getBoundingClientRect().x,y:c.getBoundingClientRect().y})));
  assert.deepEqual(layout.map(c=>c.color),['K','C','M','Y']);
- assert.equal(layout[0].y,layout[1].y);assert.equal(layout[2].y,layout[3].y);
- assert.equal(layout[0].x,layout[2].x);assert.equal(layout[1].x,layout[3].x);
- assert.ok(layout[0].x<layout[1].x && layout[0].y<layout[2].y);
+ assert.ok(layout.every(c=>c.x===layout[0].x));
+ assert.ok(layout.every((c,index)=>index===0 || c.y>layout[index-1].y));
  // 未儲存就取消，不產生正式紀錄。
  const k=state.items.find(i=>i.color==='K').id;
  await a.locator(`[data-item="${k}"][data-delta="2"]`).click();assert.equal(state.items[0].count,5);
  await a.locator('#cancel').click();assert.equal(state.logs.length,4);
  // 第二裝置透過 15 秒輪詢自動讀到新項目。
  await b.locator('nav [data-tab="home"]').click();await b.waitForSelector(`[data-item="${k}"]`,{timeout:20000});
+ const desktop=await b.locator('#items .card').evaluateAll(cards=>cards.map(c=>({color:c.querySelector('.mark').textContent,x:c.getBoundingClientRect().x,y:c.getBoundingClientRect().y})));
+ assert.deepEqual(desktop.map(c=>c.color),['K','C','M','Y']);
+ assert.equal(desktop[0].y,desktop[1].y);assert.equal(desktop[2].y,desktop[3].y);
+ assert.equal(desktop[0].x,desktop[2].x);assert.equal(desktop[1].x,desktop[3].x);
+ assert.ok(desktop[0].x<desktop[1].x && desktop[0].y<desktop[2].y);
  await a.locator(`[data-item="${k}"][data-delta="-2"]`).click();
  await b.locator(`[data-item="${k}"][data-delta="-1"]`).click();
  await a.locator('#save').click();await a.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
