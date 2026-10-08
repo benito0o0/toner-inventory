@@ -1,10 +1,11 @@
 import { colors, emptyState, validCount, conflicts, rebase, filterLogs, readLegacy } from './inventory.js';
-import { SheetBridge } from './transport.js';
+import { SheetBridge } from './transport.js?v=20261009-anonymous';
+import { defaultEndpoint, chooseEndpoint } from './config.js';
 const $ = id => document.getElementById(id);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const names = { K:'#293241', C:'#00a6c7', M:'#df448a', Y:'#edba32' };
 const workspaceKey = 'toner-inventory.workspace.v2';
-let state = emptyState(), drafts = {}, pending = null, bridge = null, connected = false, busy = false, polling = false, page = 0, endpoint = '', lastRead = '', legacyRaw = null, legacy = null, storageHealthy = true;
+let state = emptyState(), drafts = {}, pending = null, bridge = null, connected = false, busy = false, polling = false, page = 0, endpoint = defaultEndpoint, lastRead = '', legacyRaw = null, legacy = null, storageHealthy = true;
 function message(text) { $('notice').textContent = text; }
 try {
   legacyRaw = localStorage.getItem('toner-inventory.v1');
@@ -13,7 +14,7 @@ try {
     legacy = readLegacy(legacyRaw);
   }
   const stored = JSON.parse(localStorage.getItem(workspaceKey) || 'null');
-  if (stored) { drafts = stored.drafts || {}; pending = stored.pending || null; endpoint = stored.endpoint || ''; }
+  if (stored) { drafts = stored.drafts || {}; pending = stored.pending || null; endpoint = chooseEndpoint(stored); }
 } catch { storageHealthy = false; message('無法讀取或備份本機資料。為保護舊庫存，已停用寫入；請先匯出備份並檢查瀏覽器儲存權限。'); }
 function persist() {
   try { localStorage.setItem(workspaceKey, JSON.stringify({ endpoint, drafts, pending })); }

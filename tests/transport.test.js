@@ -5,10 +5,11 @@ test('握手逾時後重新建立連線；舊通道訊息被忽略；讀取與�
  const original = { window:globalThis.window, document:globalThis.document, setTimeout:globalThis.setTimeout, clearTimeout:globalThis.clearTimeout };
  let listener, next=0;const timers=new Map(),frames=[];
  globalThis.window={addEventListener:(_,f)=>listener=f,removeEventListener(){}};
- globalThis.document={createElement:()=>({remove(){this.removed=true;}}),body:{append:f=>frames.push(f)}};
+ globalThis.document={createElement:()=>({credentialless:false,remove(){this.removed=true;}}),body:{append:f=>frames.push(f)}};
  globalThis.setTimeout=f=>{timers.set(++next,f);return next;};globalThis.clearTimeout=id=>timers.delete(id);
  try {
   const bridge=new SheetBridge('https://script.google.com/macros/s/example/exec');
+  assert.equal(frames[0].credentialless,true);
   const first=bridge.call('read');const oldChannel=bridge.channel;timers.get(bridge.readyTimer)();
   await assert.rejects(first,/逾時/);
   const retry=bridge.call('read');assert.equal(frames.length,2);assert.equal(frames[0].removed,true);assert.notEqual(bridge.channel,oldChannel);

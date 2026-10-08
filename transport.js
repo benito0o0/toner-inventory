@@ -25,6 +25,8 @@ export class SheetBridge {
     this.channel = crypto.randomUUID();
     const url = new URL(this.url); url.searchParams.set('channel', this.channel);
     this.frame = document.createElement('iframe');
+    // 支援的瀏覽器使用獨立匿名環境，避免既有 Google 登入 Cookie 干擾公開部署。
+    if ('credentialless' in this.frame) this.frame.credentialless = true;
     this.frame.hidden = true; this.frame.title = '共用庫存資料連線'; this.frame.src = url.href;
     this.ready = new Promise((resolve, reject) => {
       this.readyResolve = resolve; this.readyReject = reject;
