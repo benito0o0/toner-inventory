@@ -30,7 +30,7 @@ try{
  await a.evaluate(()=>localStorage.setItem('toner-inventory.v1',JSON.stringify({K:5,C:2,M:0,Y:1})));
  await a.reload();await assert.equal(await a.evaluate(()=>localStorage.getItem('toner-inventory.v1.backup')),JSON.stringify({K:5,C:2,M:0,Y:1}));
  for(const p of pages){await p.locator('nav [data-tab="settings"]').click();await p.locator('#endpoint').fill('https://script.google.com/macros/s/test/exec');await p.locator('#connect-form button').click();await p.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));}
- await a.locator('#migration-brand').fill('品牌甲');await a.locator('#migration-model').fill('四色設備');await a.locator('#migration-confirm').check();await a.locator('#migrate-form button').click();await a.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
+ await a.locator('#migration-model').fill('四色設備');await a.locator('#migration-confirm').check();await a.locator('#migrate-form button').click();await a.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(state.items.length,4);assert.equal(state.items[0].count,5);
  await a.locator('nav [data-tab="home"]').click();
  // 未儲存就取消，不產生正式紀錄。
@@ -71,9 +71,9 @@ try{
  assert.equal(await success.locator(`[data-item="${k}"][data-delta="-1"]`).isDisabled(),true);
  assert.equal(await success.locator('#recent .log').count(),5);
  await success.locator('nav [data-tab="history"]').click();assert.equal(await success.locator('#history-list .log').count(),state.logs.length);
- await success.locator('#history-brand').selectOption('品牌甲');await success.locator('#history-model').fill('不存在');assert.equal(await success.locator('#history-list .log').count(),0);
+ await success.locator('#history-model').fill('不存在');assert.equal(await success.locator('#history-list .log').count(),0);
  // 新增單色與防重複，選取型號保持不變。
- await success.locator('nav [data-tab="settings"]').click();await success.locator('#new-brand').fill('品牌乙');await success.locator('#new-model').fill('單色設備');await success.locator('#add-form button').click();await success.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
+ await success.locator('nav [data-tab="settings"]').click();await success.locator('#new-model').fill('單色設備');await success.locator('#add-form button').click();await success.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(state.items.length,5);await success.locator('#add-form button').click();await success.waitForFunction(()=>document.querySelector('#notice').textContent.includes('重複'));assert.equal(state.items.length,5);
  // 匯出備份包含全部歷史，未清除舊瀏覽器資料。
  const exported=success.waitForEvent('download');await success.locator('#backup').click();const download=await exported;const stream=await download.createReadStream();let text='';for await(const c of stream)text+=c;assert.equal(JSON.parse(text).state.logs.length,state.logs.length);
@@ -100,7 +100,7 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  await bridgePage.goto(url);await bridgePage.locator('nav [data-tab="settings"]').click();await bridgePage.locator('#endpoint').fill('https://script.google.com/macros/s/bridge-test/exec');await bridgePage.locator('#connect-form button').click();
  await bridgePage.waitForFunction(()=>document.querySelector('#connection').textContent.startsWith('已連接'));
  assert.match(await bridgePage.locator('#notice').textContent(),/連接成功/);
- await bridgePage.locator('#new-brand').fill('橋接測試');await bridgePage.locator('#new-model').fill('黑白設備');await bridgePage.locator('#add-form button').click();await bridgePage.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
+ await bridgePage.locator('#new-model').fill('黑白設備');await bridgePage.locator('#add-form button').click();await bridgePage.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(await bridgePage.evaluate(()=>document.querySelector('#model').options.length),2);
  await bridgeContext.close();
  console.log('瀏覽器測試通過：手機排版、舊資料備份與遷移、新增與重複檢查、取消、零庫存、15 秒雙裝置同步、暫存衝突、同時儲存、逾時冪等重試、完整歷史與匯出。Google 橋接使用模擬服務，尚待實際部署驗證。');

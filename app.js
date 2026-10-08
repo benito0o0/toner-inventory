@@ -42,12 +42,12 @@ function renderFilters() {
   $('brands-list').innerHTML = brands.map(b => `<option value="${escape(b)}"></option>`).join('');
   const models = [...new Map(state.items.filter(i => (!$('brand').value || i.brand === $('brand').value) && i.model.toLowerCase().includes($('search').value.toLowerCase())).map(i => [JSON.stringify([i.brand,i.model]), i])).values()];
   const selected = $('model').value;
-  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.brand)} · ${escape(i.model)}</option>`).join('');
+  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.model)}</option>`).join('');
   if (models.some(i => JSON.stringify([i.brand,i.model]) === selected)) $('model').value = selected;
   else if (models.length) $('model').value = JSON.stringify([models[0].brand,models[0].model]);
 }
 function logHTML(logs) {
-  return logs.length ? logs.map(l => `<div class="log"><small>${escape(new Date(l.time).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false }))} · ${escape(l.kind)}</small>${escape(l.brand)}／${escape(l.model)} · ${l.color} ${colors[l.color]}　<strong>${l.delta > 0 ? '+' : ''}${l.delta}</strong> 支（${l.before} → ${l.after}）</div>`).join('') : '<p>沒有異動紀錄</p>';
+  return logs.length ? logs.map(l => `<div class="log"><small>${escape(new Date(l.time).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false }))} · ${escape(l.kind)}</small>${escape(l.model)} · ${l.color} ${colors[l.color]}　<strong>${l.delta > 0 ? '+' : ''}${l.delta}</strong> 支（${l.before} → ${l.after}）</div>`).join('') : '<p>沒有異動紀錄</p>';
 }
 function renderHistory() {
   const logs = filterLogs(state.logs, { start:$('start-date').value, end:$('end-date').value, brand:$('history-brand').value, model:$('history-model').value });
@@ -58,7 +58,7 @@ function renderHistory() {
 }
 function renderCards() {
   const selected = currentItems();
-  $('summary').textContent = selected.length ? `已選取 ${selected[0].brand}／${selected[0].model}，共 ${selected.length} 個顏色` : (state.items.length ? '沒有符合條件的型號' : '尚無共用品項；請在設定新增或匯入舊庫存。');
+  $('summary').textContent = selected.length ? `已選取 ${selected[0].model}，共 ${selected.length} 個顏色` : (state.items.length ? '沒有符合條件的型號' : '尚無共用品項；請在設定新增或匯入舊庫存。');
   $('items').innerHTML = selected.map(i => {
     const d = drafts[i.id], count = d ? d.base + d.delta : i.count;
     return `<article class="card" style="--ink:${names[i.color]}"><div class="identity"><span class="mark ${i.color}">${i.color}</span><h2>${colors[i.color]}色碳粉</h2></div><div class="quantity">${count}<small>支</small></div><div class="saved">最新共用庫存：${i.count} 支${d ? `<br>我的暫存：${d.delta>0?'+':''}${d.delta}（原庫存 ${d.base}）` : ''}</div>${i.count <= i.threshold ? `<span class="low">低庫存提醒：門檻 ${i.threshold} 支</span>` : ''}<div class="controls">${[-2,-1,1,2].map(delta => `<button data-item="${escape(i.id)}" data-delta="${delta}" aria-label="${i.color} ${colors[i.color]}${delta>0?'加':'減'}${Math.abs(delta)}支" ${busy || pending || !connected || !storageHealthy || !validCount(count+delta) ? 'disabled' : ''}>${delta>0?'+':'−'}${Math.abs(delta)}</button>`).join('')}</div></article>`;
