@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"></head><body><p>共用庫存資料連線</p><script>
+const channel = <?!= channelJSON ?>;
+const allowedOrigin = <?!= originJSON ?>;
+window.addEventListener('message', event => {
+  const msg = event.data;
+  if (event.origin !== allowedOrigin || event.source !== window.top || !msg || msg.channel !== channel || !['read','write'].includes(msg.action)) return;
+  const reply = body => window.top.postMessage({ channel, requestId:msg.requestId, ...body }, allowedOrigin);
+  google.script.run.withSuccessHandler(result => reply({result})).withFailureHandler(error => reply({error:error.message || '共用資料服務失敗'})).api({ action:msg.action, operation:msg.operation });
+});
+window.top.postMessage({channel,type:'ready'},allowedOrigin);
+</script></body></html>
