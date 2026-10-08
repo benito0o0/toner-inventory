@@ -31,7 +31,11 @@ function exportCSV(name, rows) {
   }).join(',')).join('\r\n');
   download(name, '\uFEFF' + csv, 'text/csv;charset=utf-8');
 }
-function currentItems() { return state.items.filter(i => JSON.stringify([i.brand,i.model]) === $('model').value); }
+function currentItems() {
+  const order = ['K', 'C', 'M', 'Y'];
+  return state.items.filter(i => JSON.stringify([i.brand,i.model]) === $('model').value)
+    .sort((a, b) => order.indexOf(a.color) - order.indexOf(b.color));
+}
 function options(el, values, placeholder) {
   const selected = el.value;
   el.innerHTML = `<option value="">${placeholder}</option>` + values.map(v => `<option value="${escape(v)}">${escape(v)}</option>`).join('');

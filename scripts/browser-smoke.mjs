@@ -7,7 +7,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 let state = emptyState(), loseResponse = false, simultaneousGate = null;
 const api = http.createServer(async (req,res) => {
  res.setHeader('Access-Control-Allow-Origin','*');
- if(req.url==='/read'){res.end(JSON.stringify(state));return;}
+ if(req.url==='/read'){res.end(JSON.stringify({...state,items:[...state.items].sort((a,b)=>['M','Y','K','C'].indexOf(a.color)-['M','Y','K','C'].indexOf(b.color))}));return;}
  let body='';for await(const chunk of req)body+=chunk;
  try{const op=JSON.parse(body);if(simultaneousGate){const gate=simultaneousGate;gate.remaining--;if(!gate.remaining){simultaneousGate=null;gate.release();}await gate.promise;}state=applyOperation(state,op,new Date().toISOString());if(loseResponse){loseResponse=false;res.writeHead(503);res.end('模擬儲存完成後回覆中斷');return;}res.end(JSON.stringify({state}));}
  catch(e){res.end(JSON.stringify({error:e.message,rejected:true}));}
@@ -36,6 +36,12 @@ try{
  await a.locator('#migration-model').fill('四色設備');await a.locator('#migration-confirm').check();await a.locator('#migrate-form button').click();await a.waitForFunction(()=>document.querySelector('#notice').textContent.includes('儲存成功'));
  assert.equal(state.items.length,4);assert.equal(state.items[0].count,5);
  await a.locator('nav [data-tab="home"]').click();
+ // 即使共用資料順序不同，手機仍固定 K／C／M／Y 的兩欄位置。
+ const layout=await a.locator('#items .card').evaluateAll(cards=>cards.map(c=>({color:c.querySelector('.mark').textContent,x:c.getBoundingClientRect().x,y:c.getBoundingClientRect().y})));
+ assert.deepEqual(layout.map(c=>c.color),['K','C','M','Y']);
+ assert.equal(layout[0].y,layout[1].y);assert.equal(layout[2].y,layout[3].y);
+ assert.equal(layout[0].x,layout[2].x);assert.equal(layout[1].x,layout[3].x);
+ assert.ok(layout[0].x<layout[1].x && layout[0].y<layout[2].y);
  // 未儲存就取消，不產生正式紀錄。
  const k=state.items.find(i=>i.color==='K').id;
  await a.locator(`[data-item="${k}"][data-delta="2"]`).click();assert.equal(state.items[0].count,5);
