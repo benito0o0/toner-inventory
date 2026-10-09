@@ -138,6 +138,22 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  const numericLabels=(await a.locator('#model option').allTextContents()).filter(m=>['3212','99','2020','325Z','20'].includes(m));
  assert.deepEqual(numericLabels,['20','99','325Z','2020','3212']);
  assert.equal(await a.locator('#model').inputValue(),previous);
+ // 星號由正式庫存決定：任一色有庫存即保留，暫存／取消不影響正式標示。
+ const options=await a.locator('#model option').allTextContents();
+ assert.ok(options.includes('四色設備 *'));assert.ok(options.includes('單色設備'));
+ const target=state.items.find(i=>i.model==='3212');
+ state=applyOperation(state,{id:'star-stock-0001',type:'adjust',changes:[{id:target.id,version:target.version,delta:1}]},new Date().toISOString());
+ await a.waitForFunction(()=>[...document.querySelector('#model').options].some(o=>o.textContent==='3212 *'));
+ assert.equal(await a.locator('#model').inputValue(),previous);
+ await a.locator('#model').selectOption(JSON.stringify([target.brand,target.model]));
+ await a.locator(`[data-item="${target.id}"][data-delta="-1"]`).click();
+ assert.equal(await a.locator('#model option:checked').textContent(),'3212 *');
+ await a.locator('#cancel').click();assert.equal(await a.locator('#model option:checked').textContent(),'3212 *');
+ await a.locator(`[data-item="${target.id}"][data-delta="-1"]`).click();await a.locator('#save').click();
+ await a.waitForFunction(()=>document.querySelector('#model').selectedOptions[0].textContent==='3212');
+ assert.equal(await a.locator('#model').inputValue(),JSON.stringify([target.brand,target.model]));
+ assert.equal(state.items.find(i=>i.id===target.id).count,0);
+
 
  console.log('瀏覽器測試通過：手機排版、舊資料備份與遷移、新增與重複檢查、取消、零庫存、5 秒雙裝置同步、暫存衝突、同時儲存、逾時冪等重試、完整歷史與匯出。Google 橋接使用模擬服務，尚待實際部署驗證。');
 }finally{await browser.close();await new Promise(r=>api.close(r));await new Promise(r=>web.close(r));}

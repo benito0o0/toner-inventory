@@ -7,7 +7,7 @@
 <p id="notice" role="status" aria-live="polite">請先在「設定與備份」連接共用資料；舊瀏覽器庫存會保留。</p>
 <section id="home" class="tab">
 <details id="legacy-home" class="panel" hidden><summary>此瀏覽器的原始庫存備份（尚未自動匯入共用資料）</summary><p id="legacy-home-counts"></p><p>原始資料仍保留，請在各裝置核對後，只匯入你確認採用的一份。</p><button data-tab="settings">前往備份與遷移</button></details>
-<div class="filters"><label hidden>品牌<select id="brand"><option value="">全部品牌</option></select></label><label>搜尋型號<input id="search" type="search" placeholder="輸入型號"></label><label>設備型號<select id="model"><option value="">請選擇型號</option></select></label></div>
+<div class="filters"><label hidden>品牌<select id="brand"><option value="">全部品牌</option></select></label><label>搜尋型號<input id="search" type="search" placeholder="輸入型號"></label><label>設備型號（* 表示有庫存）<select id="model"><option value="">請選擇型號</option></select></label></div>
 <p id="summary"></p><div id="items" class="items"></div>
 <div id="conflict" hidden><p>他人已更新你正在調整的品項。暫存內容仍保留，請核對卡片上的最新數量。</p><button id="rebase">確認以最新庫存重新套用我的增減</button><button id="discard">取消我的變更</button></div>
 <section class="panel"><h2>最近五筆異動</h2><div id="recent"></div><button data-tab="history">查看完整歷史</button></section>
@@ -19,4 +19,4 @@
 <section class="panel"><h2>備份與舊庫存遷移</h2><p>舊資料不會清空。請先在各裝置匯出，再確認採用哪一份。系統不會自行相加，也不會覆蓋既有品項。</p><button id="backup">匯出完整備份（含所有異動）</button><button id="inventory-csv">匯出庫存 CSV</button><button id="history-csv">匯出完整異動 CSV</button><button id="legacy-download">匯出此瀏覽器舊庫存</button><label>載入另一裝置的舊庫存 JSON<input id="legacy-file" type="file" accept=".json,application/json"></label><pre id="legacy-preview"></pre><form id="migrate-form"><input id="migration-brand" type="hidden" value="未分類"><label>匯入型號<input id="migration-model" maxlength="80" required></label><label class="checkbox"><input id="migration-confirm" type="checkbox" required>我已比較各裝置資料，確認只採用上方這份庫存</label><button type="submit">確認匯入這份舊庫存</button></form></section>
 </section>
 <footer><div><strong id="status">尚未連接</strong><span id="draft-info">沒有待儲存變更</span></div><div class="actions"><button id="cancel" disabled>取消變更</button><button id="save" class="primary" disabled>儲存</button></div></footer>
-</main><script type="module" src="app.js?v=20261009-model-order"></script></body></html>
+</main><script type="module" src="app.js?v=20261009-stock-star"></script></body></html>

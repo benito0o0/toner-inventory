@@ -49,8 +49,9 @@ function renderFilters() {
   $('brands-list').innerHTML = brands.map(b => `<option value="${escape(b)}"></option>`).join('');
   const models = [...new Map(state.items.filter(i => (!$('brand').value || i.brand === $('brand').value) && i.model.toLowerCase().includes($('search').value.toLowerCase())).map(i => [JSON.stringify([i.brand,i.model]), i])).values()];
   models.sort((a, b) => compareModels(a.model, b.model));
+  const stocked = new Set(state.items.filter(i => i.count > 0).map(i => JSON.stringify([i.brand, i.model])));
   const selected = $('model').value;
-  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.model)}</option>`).join('');
+  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.model)}${stocked.has(JSON.stringify([i.brand,i.model])) ? ' *' : ''}</option>`).join('');
   if (models.some(i => JSON.stringify([i.brand,i.model]) === selected)) $('model').value = selected;
   else if (models.length) $('model').value = JSON.stringify([models[0].brand,models[0].model]);
 }
