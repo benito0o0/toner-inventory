@@ -4,7 +4,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { emptyState, applyOperation } from '../inventory.js';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-let state = emptyState(), loseResponse = false, simultaneousGate = null, delayReads = false;
+let state = {...emptyState(),modelOnly:true}, loseResponse = false, simultaneousGate = null, delayReads = false;
 const api = http.createServer(async (req,res) => {
  res.setHeader('Access-Control-Allow-Origin','*');
  if(req.url==='/read'){if(delayReads)await new Promise(resolve=>setTimeout(resolve,1500));res.end(JSON.stringify({...state,items:[...state.items].sort((a,b)=>['M','Y','K','C'].indexOf(a.color)-['M','Y','K','C'].indexOf(b.color))}));return;}
@@ -117,7 +117,7 @@ try{
  await bridgePage.route('https://mock.googleusercontent.com/bridge*',route=>{
   const channel=new URL(route.request().url()).searchParams.get('channel');
   const shim=`<script>${core}
-let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;return this;},withFailureHandler(f){this.failure=f;return this;},api(req){try{let result;if(req.action==='read')result=shared;else{shared=applyOperation(shared,req.operation,new Date().toISOString());result={state:shared};}this.success(result);}catch(e){this.failure(e);}}};window.google={script:{run:runner}};</script>`;
+let shared={...emptyState(),modelOnly:true};const runner={withSuccessHandler(f){this.success=f;return this;},withFailureHandler(f){this.failure=f;return this;},api(req){try{let result;if(req.action==='read')result=shared;else{shared=applyOperation(shared,req.operation,new Date().toISOString());result={state:shared};}this.success(result);}catch(e){this.failure(e);}}};window.google={script:{run:runner}};</script>`;
   const body=bridgeTemplate.replace('<?!= channelJSON ?>',JSON.stringify(channel)).replace('<?!= originJSON ?>',JSON.stringify(url)).replace('<script>',shim+'<script>');
   route.fulfill({contentType:'text/html',body});
  });
@@ -145,13 +145,13 @@ let shared=emptyState();const runner={withSuccessHandler(f){this.success=f;retur
  state=applyOperation(state,{id:'star-stock-0001',type:'adjust',changes:[{id:target.id,version:target.version,delta:1}]},new Date().toISOString());
  await a.waitForFunction(()=>[...document.querySelector('#model').options].some(o=>o.textContent==='3212 *'));
  assert.equal(await a.locator('#model').inputValue(),previous);
- await a.locator('#model').selectOption(JSON.stringify([target.brand,target.model]));
+ await a.locator('#model').selectOption(JSON.stringify([target.model.toLowerCase(),'']));
  await a.locator(`[data-item="${target.id}"][data-delta="-1"]`).click();
  assert.equal(await a.locator('#model option:checked').textContent(),'3212 *');
  await a.locator('#cancel').click();assert.equal(await a.locator('#model option:checked').textContent(),'3212 *');
  await a.locator(`[data-item="${target.id}"][data-delta="-1"]`).click();await a.locator('#save').click();
  await a.waitForFunction(()=>document.querySelector('#model').selectedOptions[0].textContent==='3212');
- assert.equal(await a.locator('#model').inputValue(),JSON.stringify([target.brand,target.model]));
+ assert.equal(await a.locator('#model').inputValue(),JSON.stringify([target.model.toLowerCase(),'']));
  assert.equal(state.items.find(i=>i.id===target.id).count,0);
 
 

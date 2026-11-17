@@ -5,7 +5,7 @@ const now='2026-10-09T04:00:00Z';
 const add=(id='create-00001',counts={K:5,C:3,M:0,Y:2})=>({id,type:'add',brand:'品牌甲',model:'型號一',counts,thresholds:{K:2}});
 const seed=()=>applyOperation(emptyState(),add(),now);
 test('新增單色與四色、初始量、門檻、禁止重複與錯誤數值',()=>{
- const s=seed(); assert.equal(s.items.length,4);assert.equal(s.items[0].threshold,2);
+ const s=seed(); assert.equal(s.items.length,4);assert.equal(s.items[0].threshold,0);
  assert.throws(()=>applyOperation(s,add('duplicate-0001'),now),/重複/);
  const mono=applyOperation(s,{...add('mono-000001',{K:0}),model:'型號二'},now);
  assert.equal(mono.items.length,5);assert.equal(mono.items.at(-1).count,0);
@@ -49,4 +49,12 @@ test('完整歷史不截斷，臺北日期與品牌型號篩選',()=>{
 test('舊資料驗證保留所有顏色，不相加、不接受損壞或負數',()=>{
  assert.deepEqual(readLegacy('{"K":9,"C":2,"M":0,"Y":1}'),{K:9,C:2,M:0,Y:1});
  assert.throws(()=>readLegacy('{"K":-1,"C":2,"M":0,"Y":1}'));
+});
+
+test('跨舊品牌的同型號不可重複，保留舊 ID 與數量',()=>{
+ const s=seed();const original=JSON.stringify(s);
+ assert.throws(()=>applyOperation(s,{...add('cross-brand-0001'),brand:'其他品牌'},now),/重複/);
+ assert.equal(JSON.stringify(s),original);
+ const mono=applyOperation(emptyState(),{id:'no-brand-00001',type:'add',model:'325Z',counts:{K:0}},now);
+ assert.equal(mono.items[0].model,'325Z');
 });

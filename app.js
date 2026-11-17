@@ -1,4 +1,4 @@
-import { colors, emptyState, validCount, conflicts, rebase, filterLogs, readLegacy } from './inventory.js';
+import { colors, emptyState, validCount, conflicts, rebase, filterLogs, readLegacy, key } from './inventory.js';
 import { SheetBridge } from './transport.js?v=20261009-anonymous';
 import { defaultEndpoint, chooseEndpoint } from './config.js';
 import { loadSnapshot, saveSnapshot } from './cache.js';
@@ -35,7 +35,7 @@ function exportCSV(name, rows) {
 }
 function currentItems() {
   const order = ['K', 'C', 'M', 'Y'];
-  return state.items.filter(i => JSON.stringify([i.brand,i.model]) === $('model').value)
+  return state.items.filter(i => key('',i.model,'') === $('model').value)
     .sort((a, b) => order.indexOf(a.color) - order.indexOf(b.color));
 }
 function options(el, values, placeholder) {
@@ -47,13 +47,13 @@ function renderFilters() {
   const brands = [...new Set(state.items.map(i => i.brand))].sort();
   options($('brand'), brands, '全部品牌'); options($('history-brand'), brands, '全部品牌');
   $('brands-list').innerHTML = brands.map(b => `<option value="${escape(b)}"></option>`).join('');
-  const models = [...new Map(state.items.filter(i => (!$('brand').value || i.brand === $('brand').value) && i.model.toLowerCase().includes($('search').value.toLowerCase())).map(i => [JSON.stringify([i.brand,i.model]), i])).values()];
+  const models = [...new Map(state.items.filter(i => i.model.toLowerCase().includes($('search').value.toLowerCase())).map(i => [key('',i.model,''), i])).values()];
   models.sort((a, b) => compareModels(a.model, b.model));
-  const stocked = new Set(state.items.filter(i => i.count > 0).map(i => JSON.stringify([i.brand, i.model])));
+  const stocked = new Set(state.items.filter(i => i.count > 0).map(i => key('',i.model,'')));
   const selected = $('model').value;
-  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(JSON.stringify([i.brand,i.model]))}">${escape(i.model)}${stocked.has(JSON.stringify([i.brand,i.model])) ? ' *' : ''}</option>`).join('');
-  if (models.some(i => JSON.stringify([i.brand,i.model]) === selected)) $('model').value = selected;
-  else if (models.length) $('model').value = JSON.stringify([models[0].brand,models[0].model]);
+  $('model').innerHTML = '<option value="">請選擇型號</option>' + models.map(i => `<option value="${escape(key('',i.model,''))}">${escape(i.model)}${stocked.has(key('',i.model,'')) ? ' *' : ''}</option>`).join('');
+  if (models.some(i => key('',i.model,'') === selected)) $('model').value = selected;
+  else if (models.length) $('model').value = key('',models[0].model,'');
 }
 function logHTML(logs) {
   return logs.length ? logs.map(l => `<div class="log"><small>${escape(new Date(l.time).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', hour12:false }))} · ${escape(l.kind)}</small>${escape(l.model)} · ${l.color} ${colors[l.color]}　<strong>${l.delta > 0 ? '+' : ''}${l.delta}</strong> 支（${l.before} → ${l.after}）</div>`).join('') : '<p>沒有異動紀錄</p>';
@@ -80,6 +80,7 @@ function render() {
   renderFilters(); renderCards(); renderHistory();
   $('recent').innerHTML = logHTML(state.logs.slice(-5).reverse());
   renderConnection();
+  $('backend-status').textContent = state.modelOnly ? '共用服務已支援只依型號管理與防重複。' : '共用服務尚未確認支援新版型號防重複，新增暫停；既有庫存仍可調整。請更新原 Apps Script 部署，勿另建試算表。';
   const collision = conflicts(state, drafts).length;
   $('conflict').hidden = !collision;
   $('rebase').disabled = busy || !!pending || !connected;
@@ -89,7 +90,7 @@ function render() {
   $('cancel').disabled = busy || !!pending || !Object.keys(drafts).length;
   $('draft-info').textContent = pending ? '待確認操作結果；請重試，暫勿取消或再次新增' : `${Object.keys(drafts).length} 個品項尚未儲存`;
   $('status').textContent = busy ? '儲存中…' : pending ? '結果尚未確認／儲存失敗' : !connected ? '尚未連接' : collision ? '變更衝突，請核對' : Object.keys(drafts).length ? '尚未儲存' : '共用庫存已載入';
-  document.querySelectorAll('#add-form button, #migrate-form button').forEach(b => b.disabled = busy || !!pending || !connected || !storageHealthy || !!Object.keys(drafts).length);
+  document.querySelectorAll('#add-form button, #migrate-form button').forEach(b => b.disabled = busy || !!pending || !connected || !storageHealthy || !state.modelOnly || !!Object.keys(drafts).length);
   $('connect-form').querySelector('button').disabled = busy || !!pending || !!Object.keys(drafts).length;
 }
 async function refresh() {
@@ -97,12 +98,14 @@ async function refresh() {
   polling = true;
   try {
     const source = bridge;
+    const readRevision = state.revision;
     const recovering = !connected;
     const next = await source.call('read');
-    if (source !== bridge) return;
+    if (source !== bridge || busy || state.revision !== readRevision) return;
     if (next.schema !== 2 || !Array.isArray(next.items) || !Array.isArray(next.logs)) throw Error('共用資料格式無效');
     const changed = state.revision !== next.revision;
-    if (!connected || next.revision >= state.revision) state = next; connected = true; cachedAt = ''; lastRead = new Date().toLocaleTimeString('zh-TW');
+    if (next.revision < state.revision) return;
+    state = next; connected = true; cachedAt = ''; lastRead = new Date().toLocaleTimeString('zh-TW');
     saveSnapshot(localStorage, endpoint, state, new Date().toISOString());
     if (recovering) message(pending ? '連接成功，已讀取共用資料。仍有操作結果待確認，請重試同一筆操作。' : Object.keys(drafts).length ? '連接成功，已讀取共用資料；你的待儲存變更仍保留。' : '連接成功，已讀取共用資料。');
     if (changed && Object.keys(drafts).length) message('已收到他人更新；你的暫存內容仍保留。若有衝突，請核對後重新套用或取消。');
@@ -123,6 +126,10 @@ async function connect(url) {
 }
 async function submit(operation) {
   if (busy || !bridge || !connected || !storageHealthy) return;
+  if (!pending && operation.type === 'add') {
+    if (!state.modelOnly) { message('共用服務需先更新，才能安全新增型號；既有庫存仍可調整。請查看設定。'); return; }
+    if (state.items.some(i => key('',i.model,'') === key('',operation.model,''))) { message('此型號已存在，不可重複建立。'); return; }
+  }
   busy = true; let savedSuccessfully = false;
   try {
     if (!pending) { pending = operation; persist(); }
@@ -178,9 +185,9 @@ $('legacy-download').addEventListener('click', () => { if(legacyRaw)download('�
 $('legacy-file').addEventListener('change', async e => { try { const file=e.target.files[0]; if(!file)return; if(file.size>100000)throw Error('舊庫存檔案過大'); const raw=await file.text(); const parsed=readLegacy(raw); legacy=parsed; showLegacy(); } catch(e) { message(e.message); } });
 $('migrate-form').addEventListener('submit', e => { e.preventDefault(); if(!legacy || !$('migration-confirm').checked)return; submit(newOperation('add',{brand:$('migration-brand').value.trim(),model:$('migration-model').value.trim(),counts:legacy,migration:true})); });
 $('backup').addEventListener('click', () => download('碳粉庫存完整備份.json',JSON.stringify({ exportedAt:new Date().toISOString(), lastSuccessfulRead:lastRead, state,drafts,pending, legacyOriginal:legacyRaw },null,2)));
-$('inventory-csv').addEventListener('click', () => exportCSV('碳粉庫存.csv',[['品牌','型號','顏色','庫存'],...state.items.map(i=>[i.brand,i.model,`${i.color} ${colors[i.color]}`,i.count])]));
-$('history-csv').addEventListener('click', () => exportCSV('完整異動紀錄.csv',[['時間','品牌','型號','顏色','增減','變更前','變更後','類型','操作識別碼'],...state.logs.map(l=>[l.time,l.brand,l.model,`${l.color} ${colors[l.color]}`,l.delta,l.before,l.after,l.kind,l.operationId])]));
+$('inventory-csv').addEventListener('click', () => exportCSV('碳粉庫存.csv',[['型號','顏色','庫存'],...state.items.map(i=>[i.model,`${i.color} ${colors[i.color]}`,i.count])]));
+$('history-csv').addEventListener('click', () => exportCSV('完整異動紀錄.csv',[['時間（臺北）','型號','顏色','增減','變更前','變更後','類型','操作識別碼'],...state.logs.map(l=>[new Date(l.time).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}),l.model,`${l.color} ${colors[l.color]}`,l.delta,l.before,l.after,l.kind,l.operationId])]));
 window.addEventListener('beforeunload', e => { if(Object.keys(drafts).length || pending){e.preventDefault();e.returnValue='';} });
-setInterval(refresh,5000); document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
-if (legacyRaw) { try { const original = readLegacy(legacyRaw); $('legacy-home').hidden = false; $('legacy-home-counts').textContent = Object.entries(original).map(([c,n]) => `${c} ${colors[c]}：${n} 支`).join(' · '); } catch {} }
+setInterval(refresh,5000); document.addEventListener('visibilitychange',()=>{if(!document.hidden){ connected = false; render(); refresh(); }});
+
 $('endpoint').value = endpoint; initialFields(); showLegacy(); render(); if(endpoint)connect(endpoint);

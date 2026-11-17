@@ -2,7 +2,7 @@
 const colors = { K: '黑', C: '青', M: '洋紅', Y: '黃' };
 function emptyState() { return { schema: 2, revision: 0, items: [], logs: [], operations: {} }; }
 function validCount(n) { return Number.isSafeInteger(n) && n >= 0 && n <= 1000000000; }
-function key(brand, model, color) { return JSON.stringify([brand.trim().normalize('NFKC').toLowerCase(), model.trim().normalize('NFKC').toLowerCase(), color]); }
+function key(brand, model, color) { return JSON.stringify([model.trim().normalize('NFKC').toLowerCase(), color]); }
 function applyOperation(state, op, now) {
   if (!op || typeof op.id !== 'string' || !/^[A-Za-z0-9_-]{10,100}$/.test(op.id)) throw Error('操作識別碼無效');
   const fingerprint = JSON.stringify(op);
@@ -14,18 +14,18 @@ function applyOperation(state, op, now) {
   const changes = [];
   if (op.type === 'add') {
     const brand = String(op.brand || '').trim(), model = String(op.model || '').trim();
-    if (!brand || !model || brand.length > 80 || model.length > 80) throw Error('品牌與型號須為 1 至 80 字');
+    if (!model || model.length > 80) throw Error('型號須為 1 至 80 字');
     const codes = Object.keys(op.counts || {}).sort().join('');
     if (codes !== 'K' && codes !== 'CKMY') throw Error('型號須包含單色 K 或四色 K／C／M／Y');
-    if (next.items.some(i => key(i.brand, i.model, 'K') === key(brand, model, 'K'))) throw Error('此品牌與型號已存在，不可重複建立');
+    if (next.items.some(i => key(i.brand, i.model, 'K') === key(brand, model, 'K'))) throw Error('此型號已存在，不可重複建立');
     for (const color of Object.keys(op.counts)) {
-      const count = op.counts[color], threshold = op.thresholds?.[color] ?? 0;
-      if (!validCount(count) || !validCount(threshold)) throw Error('初始數量與門檻須為非負整數（上限十億）');
+      const count = op.counts[color], threshold = 0;
+      if (!validCount(count) || !validCount(threshold)) throw Error('初始數量須為非負整數（上限十億）');
       const item = { id: `${op.id}_${color}`, brand, model, color, count, threshold, version: 1 };
       next.items.push(item);
       changes.push({ item, before: 0, after: count, kind: op.migration ? '舊資料匯入' : '新增品項' });
     }
-  } else if (op.type === 'adjust' || op.type === 'threshold') {
+  } else if (op.type === 'adjust') {
     if (!Array.isArray(op.changes) || !op.changes.length || op.changes.length > 1000) throw Error('變更清單無效');
     const seen = new Set();
     for (const change of op.changes) {
@@ -33,14 +33,9 @@ function applyOperation(state, op, now) {
       seen.add(change.id);
       const item = next.items.find(i => i.id === change.id);
       if (!item || item.version !== change.version) throw Error('CONFLICT：庫存或設定已被他人更新，請核對最新資料後重新套用變更');
-      if (op.type === 'adjust') {
-        if (!Number.isSafeInteger(change.delta) || change.delta === 0 || !validCount(item.count + change.delta)) throw Error('庫存不可為負數或超出上限');
-        changes.push({ item, before: item.count, after: item.count + change.delta, kind: '庫存調整' });
-        item.count += change.delta;
-      } else {
-        if (!validCount(change.threshold)) throw Error('低庫存門檻須為非負整數');
-        item.threshold = change.threshold;
-      }
+      if (!Number.isSafeInteger(change.delta) || change.delta === 0 || !validCount(item.count + change.delta)) throw Error('庫存不可為負數或超出上限');
+      changes.push({ item, before: item.count, after: item.count + change.delta, kind: '庫存調整' });
+      item.count += change.delta;
       item.version++;
     }
   } else throw Error('不支援的操作');
@@ -145,7 +140,7 @@ function api(request) {
   lock.waitLock(30000);
   try {
     const state = readState_();
-    if (request.action === 'read') return state;
+    if (request.action === 'read') return Object.assign({}, state, { modelOnly: true });
     if (JSON.stringify(request.operation).length > 200000) return { error:'操作內容過大', rejected:true };
     let next;
     try { next = applyOperation(state, request.operation, new Date().toISOString()); }
@@ -153,7 +148,7 @@ function api(request) {
     if (next !== state) writeState_(next);
     let warning = '';
     try { syncViews_(next); } catch (e) { warning = '正式資料已儲存，但檢視表尚未更新；下次儲存或執行 setup 可修復。'; }
-    return { state:next, warning };
+    return { state:Object.assign({}, next, { modelOnly:true }), warning };
   } finally { lock.releaseLock(); }
 }
 function doGet(e) {

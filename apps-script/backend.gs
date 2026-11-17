@@ -67,7 +67,7 @@ function api(request) {
   lock.waitLock(30000);
   try {
     const state = readState_();
-    if (request.action === 'read') return state;
+    if (request.action === 'read') return Object.assign({}, state, { modelOnly: true });
     if (JSON.stringify(request.operation).length > 200000) return { error:'操作內容過大', rejected:true };
     let next;
     try { next = applyOperation(state, request.operation, new Date().toISOString()); }
@@ -75,7 +75,7 @@ function api(request) {
     if (next !== state) writeState_(next);
     let warning = '';
     try { syncViews_(next); } catch (e) { warning = '正式資料已儲存，但檢視表尚未更新；下次儲存或執行 setup 可修復。'; }
-    return { state:next, warning };
+    return { state:Object.assign({}, next, { modelOnly:true }), warning };
   } finally { lock.releaseLock(); }
 }
 function doGet(e) {
